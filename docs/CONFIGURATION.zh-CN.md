@@ -246,6 +246,38 @@ schema 错误可能导致整份设置文件被忽略。例如 `ui.theme: "system
 `features.mcp` 默认就是 `true`，因此 MCP 开关已开启不能证明用户文件加载成功。
 单个服务器条目无效时，会记录 `config.mcp_server.skipped` 并跳过该条目，其他有效条目仍可加载。
 
+## Hooks
+
+Hooks 配置位于 `~/.zcode/cli/setting.json` 顶层的 `hooks` 对象，与 `mcp`、
+`plugins` 和 `permission` 平级：
+
+```json
+{
+  "hooks": {
+    "enabled": true,
+    "timeoutMs": 60000,
+    "maxOutputBytes": 32768,
+    "events": {
+      "SessionStart": [],
+      "UserPromptSubmit": []
+    }
+  }
+}
+```
+
+`enabled` 是所有 hook 执行的总开关，包括已启用插件贡献的 hook。出厂设置模板写入的是
+`enabled: false`。为 false 时，插件 hook 仍会注册——出现在 `zcode plugins list`
+中并加载进会话——但从不执行，也不会报错。会话会在
+`~/.zcode/cli/log/<date>.jsonl` 的 `bootstrap.app.startup.plugins.completed`
+事件中记录已加载的 hook 数量；插件贡献了 hook 而 `hookCount: 0` 即为此状态。
+将 `enabled` 设为 `true` 并启动新会话：会话保留其启动时加载的 hook 集合。
+
+`timeoutMs` 限制每次 hook 运行时长，`maxOutputBytes` 限制捕获的输出大小。
+配置文件 hook 按事件声明在 `hooks.events.<Event>` 下；支持的事件为
+`SessionStart`、`UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、
+`PostToolUse`、`PostToolUseFailure` 和 `Stop`。插件 hook 来自各插件的
+`hooks/hooks.json`，作用于相同的事件，并受同一个 `enabled` 开关约束。
+
 ## 模型目录与默认选择
 
 原生 registry 加载随包提供的目录，并管理上游目录刷新。`/model`、模型循环切换以及

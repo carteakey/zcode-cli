@@ -147,6 +147,52 @@ skills, and the runtime-specific command semantics. Hosts should use the
 documented command line and stdio boundary instead of importing internal
 TypeScript modules.
 
+## Hook runner prerequisite
+
+Plugin hooks, including hooks contributed by a host's integration plugin, run
+only when the user settings file enables the hook runner:
+
+```json
+{ "hooks": { "enabled": true } }
+```
+
+Shipped settings templates and runtime defaults have written `enabled: false`.
+While it is false, every plugin hook still registers — it appears in
+`zcode plugins list` and loads into the session — but never executes, without a
+diagnostic. Sessions record their loaded hook count in the
+`bootstrap.app.startup.plugins.completed` log event under
+`~/.zcode/cli/log/<date>.jsonl`; `hookCount: 0` while a plugin contributes
+hooks identifies this state. A host's setup or diagnostics should check the
+flag before attributing missed hooks to the plugin or the daemon.
+
+A session keeps the hook set it loaded at startup, so enabling the runner
+applies to sessions started afterwards.
+
+## Reference integration: Herdr
+
+[Herdr](https://herdr.dev/) drives `zcode` panes through this contract and
+reports session state back with a plugin instead of reading terminal output:
+
+- Herdr sets `HERDR_ENV=1`, `HERDR_BIN_PATH`, `HERDR_PANE_ID`,
+  `HERDR_TAB_ID`, `HERDR_WORKSPACE_ID` and `HERDR_SOCKET_PATH` in pane
+  processes. The plugin's hooks exit without side effects when they are
+  absent, so the same plugin stays inert outside Herdr.
+- Hook handlers invoke `$HERDR_BIN_PATH pane report-agent` with a stable
+  source ID, a timestamp-based sequence, the session ID and the public
+  `zcode --resume <session-id>` command for pane restore. Reporting runs as a
+  detached child with no terminal streams; failures are ignored so reporting
+  cannot interrupt the agent.
+- Status is event-driven: `SessionStart`, `UserPromptSubmit`,
+  `PermissionRequest`, `PostToolUse`, `PostToolUseFailure` and `Stop` map to
+  `idle`, `working`, `blocked` and `idle`. A pane that sits untouched at its
+  prompt box reports nothing until the first prompt, tool run or exit.
+- The daemon clears a pane's agent report when the CLI exits and the pane
+  returns to its shell. Herdr daemons before 0.9.2 accept state reports but
+  ignore the resume command.
+
+The plugin lives in the Herdr fork's `integrations/zcode` marketplace
+directory and installs through the normal plugin flow.
+
 ## Compatibility rules
 
 - A host may support any release that exposes the `zcode` npm bin and this

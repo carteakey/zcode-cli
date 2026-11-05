@@ -286,6 +286,42 @@ settings and plugin servers. `features.mcp` defaults to `true`, so seeing MCP
 enabled does not prove the user file loaded. A malformed individual server entry
 is skipped with `config.mcp_server.skipped`; valid entries can still load.
 
+## Hooks
+
+Hooks live under the top-level `hooks` object in `~/.zcode/cli/setting.json`,
+next to `mcp`, `plugins` and `permission`:
+
+```json
+{
+  "hooks": {
+    "enabled": true,
+    "timeoutMs": 60000,
+    "maxOutputBytes": 32768,
+    "events": {
+      "SessionStart": [],
+      "UserPromptSubmit": []
+    }
+  }
+}
+```
+
+`enabled` is the master switch for all hook execution, including hooks
+contributed by enabled plugins. Shipped settings templates write
+`enabled: false`. While it is false, plugin hooks still register — they appear
+in `zcode plugins list` and load into the session — but never execute, without
+an error. Sessions log their loaded hook count in the
+`bootstrap.app.startup.plugins.completed` event under
+`~/.zcode/cli/log/<date>.jsonl`; `hookCount: 0` while a plugin contributes
+hooks identifies this state. Set `enabled` to `true` and start a new session: a
+session keeps the hook set it loaded at startup.
+
+`timeoutMs` bounds each hook run and `maxOutputBytes` caps captured output.
+Configuration-file hooks are declared per event under `hooks.events.<Event>`;
+the supported events are `SessionStart`, `UserPromptSubmit`, `PreToolUse`,
+`PermissionRequest`, `PostToolUse`, `PostToolUseFailure` and `Stop`. Plugin
+hooks come from each plugin's `hooks/hooks.json`, run for the same events, and
+are gated by the same `enabled` switch.
+
 ## Model catalogs and default selection
 
 The native registry loads the bundled catalog and manages upstream catalog
